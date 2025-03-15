@@ -5,11 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Editor</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             display: flex;
             height: 100vh;
@@ -32,22 +28,15 @@
             margin-top: 10px;
             cursor: pointer;
         }
-        #sidebar button:hover {
-            background-color: #005f99;
-        }
-        #editor {
-            flex-grow: 1;
-            padding: 20px;
-        }
+        #sidebar button:hover { background-color: #005f99; }
+        #editor { flex-grow: 1; padding: 20px; }
         .file {
             background: #444;
             padding: 5px;
             margin: 5px 0;
             cursor: pointer;
         }
-        .file:hover {
-            background: #555;
-        }
+        .file:hover { background: #555; }
     </style>
 </head>
 <body>
@@ -64,52 +53,68 @@
     </div>
 
     <script>
-        let folderName = localStorage.getItem("projectFolder");
-        let files = JSON.parse(localStorage.getItem(folderName)) || [];
+        let folderHandle;
+        let files = {};
 
-        function updateFileList() {
-            const fileList = document.getElementById("file-list");
-            fileList.innerHTML = "";
-            files.forEach((file, index) => {
-                const div = document.createElement("div");
-                div.className = "file";
-                div.innerText = file.name;
-                div.onclick = () => openFile(index);
-                div.ondblclick = () => deleteFile(index);
-                fileList.appendChild(div);
-            });
+        async function loadFolder() {
+            const storedHandle = localStorage.getItem("folderHandle");
+            if (!storedHandle) {
+                alert("No folder selected.");
+                window.location.href = "index.html";
+                return;
+            }
+            folderHandle = await navigator.storage.getDirectoryHandle(storedHandle);
+            listFiles();
         }
 
-        function createFile() {
-            const fileName = prompt("Enter file name:");
-            if (fileName) {
-                files.push({ name: fileName, content: "" });
-                saveFiles();
-                updateFileList();
+        async function listFiles() {
+            const fileList = document.getElementById("file-list");
+            fileList.innerHTML = "";
+
+            for await (const entry of folderHandle.values()) {
+                if (entry.kind === "file") {
+                    files[entry.name] = entry;
+                    const div = document.createElement("div");
+                    div.className = "file";
+                    div.innerText = entry.name;
+                    div.onclick = () => openFile(entry.name);
+                    div.ondblclick = () => deleteFile(entry.name);
+                    fileList.appendChild(div);
+                }
             }
         }
 
-        function openFile(index) {
-            document.getElementById("editor-area").value = files[index].content;
-            document.getElementById("editor-area").oninput = function () {
-                files[index].content = this.value;
-                saveFiles();
+        async function createFile() {
+            const fileName = prompt("Enter file name:");
+            if (!fileName) return;
+            
+            const fileHandle = await folderHandle.getFileHandle(fileName, { create: true });
+            files[fileName] = fileHandle;
+            listFiles();
+        }
+
+        async function openFile(fileName) {
+            const fileHandle = files[fileName];
+            const file = await fileHandle.getFile();
+            const text = await file.text();
+            const editorArea = document.getElementById("editor-area");
+
+            editorArea.value = text;
+            editorArea.oninput = async function () {
+                const writable = await fileHandle.createWritable();
+                await writable.write(editorArea.value);
+                await writable.close();
             };
         }
 
-        function deleteFile(index) {
+        async function deleteFile(fileName) {
             if (confirm("Delete this file?")) {
-                files.splice(index, 1);
-                saveFiles();
-                updateFileList();
+                await folderHandle.removeEntry(fileName);
+                listFiles();
             }
         }
 
-        function saveFiles() {
-            localStorage.setItem(folderName, JSON.stringify(files));
-        }
-
-        updateFileList();
+        loadFolder();
     </script>
 
 </body>
