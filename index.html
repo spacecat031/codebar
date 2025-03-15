@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Home</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #1e1e1e;
+            color: white;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #005f99;
+        }
+    </style>
+</head>
+<body>
+
+    <button onclick="createProject()">Create New Project</button>
+
+    <script>
+        function createProject() {
+            const folderName = prompt("Enter project folder name:");
+            if (folderName) {
+                localStorage.setItem("projectFolder", folderName);
+                window.location.href = "editor.html";
+            }
+        }
+    </script>
+
+</body>
+</html>
