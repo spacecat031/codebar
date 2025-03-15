@@ -29,14 +29,17 @@
 </head>
 <body>
 
-    <button onclick="createProject()">Create New Project</button>
+    <button onclick="selectFolder()">Select Project Folder</button>
 
     <script>
-        function createProject() {
-            const folderName = prompt("Enter project folder name:");
-            if (folderName) {
-                localStorage.setItem("projectFolder", folderName);
+        async function selectFolder() {
+            try {
+                const dirHandle = await window.showDirectoryPicker();
+                localStorage.setItem("projectFolder", dirHandle.name);
+                localStorage.setItem("folderHandle", JSON.stringify(await dirHandle.requestPermission({ mode: 'readwrite' })));
                 window.location.href = "editor.html";
+            } catch (error) {
+                console.error("Folder selection failed:", error);
             }
         }
     </script>
