@@ -57,28 +57,36 @@
         let files = {};
 
         async function loadFolder() {
-            const storedHandle = localStorage.getItem("folderHandle");
-            if (!storedHandle) {
-                alert("No folder selected.");
-                window.location.href = "index.html";
-                return;
-            }
-            folderHandle = await navigator.storage.getDirectoryHandle(storedHandle);
-            listFiles();
+            // Retrieve the folder handle from IndexedDB
+            const db = await indexedDB.open("fileDB", 1);
+            db.onsuccess = async () => {
+                const tx = db.result.transaction("handles", "readonly");
+                const store = tx.objectStore("handles");
+                const request = store.get("folder");
+                request.onsuccess = async () => {
+                    folderHandle = request.result;
+                    if (!folderHandle) {
+                        alert("No folder selected.");
+                        window.location.href = "index.html";
+                        return;
+                    }
+                    listFiles();
+                };
+            };
         }
 
         async function listFiles() {
             const fileList = document.getElementById("file-list");
             fileList.innerHTML = "";
 
-            for await (const entry of folderHandle.values()) {
-                if (entry.kind === "file") {
-                    files[entry.name] = entry;
+            for await (const [name, handle] of folderHandle) {
+                if (handle.kind === "file") {
+                    files[name] = handle;
                     const div = document.createElement("div");
                     div.className = "file";
-                    div.innerText = entry.name;
-                    div.onclick = () => openFile(entry.name);
-                    div.ondblclick = () => deleteFile(entry.name);
+                    div.innerText = name;
+                    div.onclick = () => openFile(name);
+                    div.ondblclick = () => deleteFile(name);
                     fileList.appendChild(div);
                 }
             }
@@ -87,30 +95,42 @@
         async function createFile() {
             const fileName = prompt("Enter file name:");
             if (!fileName) return;
-            
-            const fileHandle = await folderHandle.getFileHandle(fileName, { create: true });
-            files[fileName] = fileHandle;
-            listFiles();
+
+            try {
+                const fileHandle = await folderHandle.getFileHandle(fileName, { create: true });
+                files[fileName] = fileHandle;
+                listFiles();
+            } catch (error) {
+                console.error("Error creating file:", error);
+            }
         }
 
         async function openFile(fileName) {
-            const fileHandle = files[fileName];
-            const file = await fileHandle.getFile();
-            const text = await file.text();
-            const editorArea = document.getElementById("editor-area");
+            try {
+                const fileHandle = files[fileName];
+                const file = await fileHandle.getFile();
+                const text = await file.text();
+                const editorArea = document.getElementById("editor-area");
 
-            editorArea.value = text;
-            editorArea.oninput = async function () {
-                const writable = await fileHandle.createWritable();
-                await writable.write(editorArea.value);
-                await writable.close();
-            };
+                editorArea.value = text;
+                editorArea.oninput = async function () {
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(editorArea.value);
+                    await writable.close();
+                };
+            } catch (error) {
+                console.error("Error opening file:", error);
+            }
         }
 
         async function deleteFile(fileName) {
             if (confirm("Delete this file?")) {
-                await folderHandle.removeEntry(fileName);
-                listFiles();
+                try {
+                    await folderHandle.removeEntry(fileName);
+                    listFiles();
+                } catch (error) {
+                    console.error("Error deleting file:", error);
+                }
             }
         }
 
